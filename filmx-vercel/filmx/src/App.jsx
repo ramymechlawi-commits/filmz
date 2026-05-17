@@ -125,18 +125,10 @@ function getNicheVideos(niche) {
 // ── HELPERS ────────────────────────────────────────────────────────────
 
 async function generateScript(niche, style, duration, topic) {
-  const nicheData = NICHES.find(n => n.id === niche);
-  const styleData = STYLES.find(s => s.id === style);
-  // Call our Vercel serverless function — no CORS issues
   const res = await fetch("/api/script", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      niche: nicheData?.label || niche,
-      style: styleData?.label || style,
-      duration,
-      topic
-    })
+    body: JSON.stringify({ niche, style, duration, topic })
   });
   return await res.json();
 }
