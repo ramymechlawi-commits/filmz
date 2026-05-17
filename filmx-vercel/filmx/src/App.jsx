@@ -127,62 +127,53 @@ function getNicheVideos(niche) {
 async function generateScript(niche, style, duration, topic) {
   const nicheData = NICHES.find(n => n.id === niche);
   const styleData = STYLES.find(s => s.id === style);
-  const prompt = topic
-    ? `Create a ${duration}-second faceless reel about: "${topic}" for the ${nicheData?.label} niche.`
-    : `Create a ${duration}-second viral faceless reel for the ${nicheData?.label} niche.`;
-
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  // Call our Vercel serverless function — no CORS issues
+  const res = await fetch("/api/script", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 600,
-      messages: [{
-        role: "user",
-        content: `${prompt} Style: ${styleData?.label}. Duration: ${duration}s.
-Return ONLY valid JSON, no markdown:
-{"title":"catchy title","hook":"3-5 word scroll-stopper","lines":["line1","line2","line3","line4","line5"],"caption":"caption with #hashtags"}`
-      }]
+      niche: nicheData?.label || niche,
+      style: styleData?.label || style,
+      duration,
+      topic
     })
   });
-  const data = await res.json();
-  const text = data.content?.find(c => c.type === "text")?.text || "";
-  return JSON.parse(text.replace(/```json|```/g, "").trim());
+  return await res.json();
 }
 
 async function submitShotstackRender(apiKey, videoUrls, scriptLines, voiceId, duration) {
   const clipDuration = parseInt(duration) / videoUrls.length;
 
   const videoClips = videoUrls.map((url, i) => ({
-    asset: { type: "video", src: url, volume: 0 },
+    asset: { type: "video", src: url, volume: 0, trim: 0 },
     start: i * clipDuration,
     length: clipDuration,
-    transition: { in: "fade", out: "fade" }
+    fit: "cover"
   }));
 
   const lineCount = scriptLines.length;
   const lineDuration = parseInt(duration) / lineCount;
   const captionClips = scriptLines.map((line, i) => ({
     asset: {
-      type: "html",
-      html: `<p>${line}</p>`,
-      css: "p{font-family:Arial;font-weight:bold;color:#ffffff;font-size:36px;text-align:center;text-shadow:2px 2px 8px rgba(0,0,0,.9);padding:8px 16px;background:rgba(0,0,0,.4);}",
-      width: 540,
-      height: 120
+      type: "title",
+      text: line,
+      style: "minimal",
+      color: "#ffffff",
+      size: "medium",
+      background: "rgba(0,0,0,0.6)",
+      position: "bottom"
     },
     start: i * lineDuration,
     length: lineDuration,
-    position: "bottom",
-    offset: { y: 0.15 },
-    transition: { in: "fade", out: "fade" }
+    position: "bottom"
   }));
 
-  const voiceClip = {
+  // Use Shotstack's free background music instead of TTS (more reliable in sandbox)
+  const audioClip = {
     asset: {
-      type: "text-to-speech",
-      text: scriptLines.join(". "),
-      voice: "Brian",
-      language: "en-US"
+      type: "audio",
+      src: "https://shotstack-assets.s3.ap-southeast-2.amazonaws.com/music/freepd/algorithm.mp3",
+      volume: 0.5
     },
     start: 0,
     length: parseInt(duration)
@@ -194,7 +185,7 @@ async function submitShotstackRender(apiKey, videoUrls, scriptLines, voiceId, du
       tracks: [
         { clips: captionClips },
         { clips: videoClips },
-        { clips: [voiceClip] }
+        { clips: [audioClip] }
       ]
     },
     output: {
