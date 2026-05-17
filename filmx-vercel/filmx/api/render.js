@@ -5,7 +5,7 @@ module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { apiKey, niche, lines } = req.body;
+  const { apiKey, lines } = req.body;
   if (!apiKey) return res.status(400).json({ error: "Missing apiKey" });
 
   const scriptLines = lines && lines.length ? lines : [
@@ -15,16 +15,7 @@ module.exports = async function handler(req, res) {
     "Save this. You will need it."
   ];
 
-  const nicheVideos = {
-    "💰 Wealth & Money": "https://shotstack-assets.s3.ap-southeast-2.amazonaws.com/footage/skater.hd.mp4",
-    "🧠 Mindset & Growth": "https://shotstack-assets.s3.ap-southeast-2.amazonaws.com/footage/earth.mp4",
-    "💪 Fitness & Health": "https://shotstack-assets.s3.ap-southeast-2.amazonaws.com/footage/skater.hd.mp4",
-    "🎬 Content Creation": "https://shotstack-assets.s3.ap-southeast-2.amazonaws.com/footage/city.mp4",
-    "📜 History & Facts": "https://shotstack-assets.s3.ap-southeast-2.amazonaws.com/footage/earth.mp4",
-    "👑 Luxury Lifestyle": "https://shotstack-assets.s3.ap-southeast-2.amazonaws.com/footage/city.mp4",
-  };
-
-  const videoSrc = nicheVideos[niche] || "https://shotstack-assets.s3.ap-southeast-2.amazonaws.com/footage/skater.hd.mp4";
+  const videoSrc = "https://shotstack-assets.s3.ap-southeast-2.amazonaws.com/footage/skater.hd.mp4";
   const clipLength = 3;
   const totalLength = scriptLines.length * clipLength;
 
@@ -37,11 +28,6 @@ module.exports = async function handler(req, res) {
   const payload = {
     timeline: {
       background: "#000000",
-      soundtrack: {
-        src: "https://s3-ap-southeast-2.amazonaws.com/shotstack-assets/music/disco.mp3",
-        effect: "fadeOut",
-        volume: 0.5
-      },
       tracks: [
         { clips: titleClips },
         { clips: [{ asset: { type: "video", src: videoSrc, volume: 0 }, start: 0, length: totalLength }] }
