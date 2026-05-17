@@ -5,7 +5,7 @@ module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { apiKey, lines } = req.body;
+  const { apiKey, niche, lines } = req.body;
   if (!apiKey) return res.status(400).json({ error: "Missing apiKey" });
 
   const scriptLines = lines && lines.length ? lines : [
@@ -19,6 +19,17 @@ module.exports = async function handler(req, res) {
   const clipLength = 3;
   const totalLength = scriptLines.length * clipLength;
 
+  const nicheBg = {
+    "💰 Wealth & Money": "#0A0800",
+    "🧠 Mindset & Growth": "#060008",
+    "💪 Fitness & Health": "#000A04",
+    "🎬 Content Creation": "#080008",
+    "📜 History & Facts": "#080400",
+    "👑 Luxury Lifestyle": "#0A0600",
+  };
+
+  const bgColor = nicheBg[niche] || "#000000";
+
   const titleClips = scriptLines.map((line, i) => ({
     asset: { type: "title", text: line, style: "minimal", color: "#ffffff", size: "medium", position: "center" },
     start: i * clipLength,
@@ -27,7 +38,7 @@ module.exports = async function handler(req, res) {
 
   const payload = {
     timeline: {
-      background: "#000000",
+      background: bgColor,
       tracks: [
         { clips: titleClips },
         { clips: [{ asset: { type: "video", src: videoSrc, volume: 0 }, start: 0, length: totalLength }] }
