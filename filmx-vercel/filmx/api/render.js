@@ -5,57 +5,70 @@ module.exports = async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { apiKey, niche, lines } = req.body;
-  if (!apiKey) return res.status(400).json({ error: "Missing apiKey" });
+  const { niche, lines, style } = req.body;
 
-  const scriptLines = lines && lines.length ? lines : [
-    "Nobody tells you this secret.",
-    "Most people miss this completely.",
-    "Here is what actually works.",
-    "Save this. You will need it."
-  ];
-
-  const videoSrc = "https://shotstack-assets.s3.ap-southeast-2.amazonaws.com/footage/skater.hd.mp4";
-  const clipLength = 3;
-  const totalLength = scriptLines.length * clipLength;
-
-  const nicheBg = {
-    "💰 Wealth & Money": "#0A0800",
-    "🧠 Mindset & Growth": "#060008",
-    "💪 Fitness & Health": "#000A04",
-    "🎬 Content Creation": "#080008",
-    "📜 History & Facts": "#080400",
-    "👑 Luxury Lifestyle": "#0A0600",
+  const nichePrompts = {
+    "💰 Wealth & Money": "cinematic luxury lifestyle, money, financial success, city skyline at night, gold aesthetic",
+    "🧠 Mindset & Growth": "cinematic motivational, person meditating at sunrise, nature, focus, achievement",
+    "💪 Fitness & Health": "cinematic fitness, athlete training, gym, running at sunrise, strong body movement",
+    "🎬 Content Creation": "cinematic social media creator, phone screen, creative workspace, digital world",
+    "📜 History & Facts": "cinematic ancient ruins, historical scenes, dramatic lighting, epic landscape",
+    "👑 Luxury Lifestyle": "cinematic luxury cars, penthouse, watches, travel, private jet, success lifestyle",
   };
 
-  const bgColor = nicheBg[niche] || "#000000";
-
-  const titleClips = scriptLines.map((line, i) => ({
-    asset: { type: "title", text: line, style: "minimal", color: "#ffffff", size: "medium", position: "center" },
-    start: i * clipLength,
-    length: clipLength
-  }));
-
-  const payload = {
-    timeline: {
-      background: bgColor,
-      tracks: [
-        { clips: titleClips },
-        { clips: [{ asset: { type: "video", src: videoSrc, volume: 0 }, start: 0, length: totalLength }] }
-      ]
-    },
-    output: { format: "mp4", resolution: "sd" }
+  const stylePrompts = {
+    "🎬 Cinematic": "cinematic, dramatic lighting, film grain, dark moody",
+    "🔥 Viral Hook": "fast cuts, vibrant colors, energetic, eye-catching",
+    "📖 Storytelling": "emotional, warm tones, narrative journey",
+    "📚 Educational": "clean, minimal, informative visuals",
+    "⚡ Motivational": "epic, sunrise, mountains, achievement",
+    "🧠 Brainrot": "chaotic energy, bright colors, fast motion",
   };
+
+  const nicheVisual = nichePrompts[niche] || "cinematic lifestyle, success, motivation";
+  const styleVisual = stylePrompts[style] || "cinematic";
+  const hook = lines && lines[0] ? lines[0] : "Nobody tells you this secret";
+
+  const videoPrompt = `${styleVisual}, ${nicheVisual}, text overlay saying "${hook}", professional short-form social media reel, vertical 9:16 format, high quality`;
 
   try {
-    const response = await fetch("https://api.shotstack.io/edit/stage/render", {
+    const response = await fetch("https://zsky.ai/api/v1/video/generate", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": apiKey },
-      body: JSON.stringify(payload)
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: videoPrompt,
+        duration: 8,
+        resolution: "1080p",
+        audio: true,
+        style: "cinematic",
+        aspect_ratio: "9:16"
+      })
     });
-    const data = await response.json();
-    if (!response.ok) return res.status(response.status).json({ error: data.message || "Shotstack error" });
-    return res.status(200).json(data);
+
+    if (!response.ok) {
+      const err = await response.text();
+      return res.status(500).json({ error: `ZSky API error: ${err}` });
+    }
+
+    const contentType = response.headers.get("content-type");
+
+    if (contentType && contentType.includes("video")) {
+      const buffer = await response.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString("base64");
+      return res.status(200).json({
+        success: true,
+        videoData: `data:video/mp4;base64,${base64}`,
+        type: "base64"
+      });
+    } else {
+      const data = await response.json();
+      return res.status(200).json({
+        success: true,
+        videoUrl: data.url || data.video_url || data.output,
+        type: "url"
+      });
+    }
+
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
