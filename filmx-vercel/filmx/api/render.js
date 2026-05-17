@@ -38,7 +38,7 @@ module.exports = async function handler(req, res) {
     timeline: {
       background: "#000000",
       soundtrack: {
-        src: "https://shotstack-assets.s3.ap-southeast-2.amazonaws.com/music/freepd/algorithm.mp3",
+        src: "https://s3-ap-southeast-2.amazonaws.com/shotstack-assets/music/disco.mp3",
         effect: "fadeOut",
         volume: 0.5
       },
