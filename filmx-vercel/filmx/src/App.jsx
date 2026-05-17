@@ -141,7 +141,7 @@ async function generateScript(niche, style, duration, topic) {
   return await res.json();
 }
 
-async function submitShotstackRender(apiKey, videoUrls, scriptLines, voiceId, duration) {
+async function submitShotstackRender(apiKey, videoUrls, scriptLines, voiceId, duration, nicheLabel) {
   const clipDuration = parseInt(duration) / videoUrls.length;
 
   const videoClips = videoUrls.map((url, i) => ({
@@ -197,11 +197,10 @@ async function submitShotstackRender(apiKey, videoUrls, scriptLines, voiceId, du
   };
 
   // Call our Vercel serverless function — no CORS issues
-  const nicheData = NICHES.find(n => n.id === niche);
   const res = await fetch("/api/render", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ apiKey, niche: nicheData?.label, lines: scriptLines })
+    body: JSON.stringify({ apiKey, niche: nicheLabel, lines: scriptLines })
   });
 
   if (!res.ok) {
@@ -407,7 +406,7 @@ function CreateView({ onGenerated, shotstackKey, onNeedKey }) {
 
       // Step 5: Submit to Shotstack
       setGenStep(5); setGenPercent(55);
-      const renderId = await submitShotstackRender(shotstackKey, videoUrls, script.lines, voice, duration);
+      const renderId = await submitShotstackRender(shotstackKey, videoUrls, script.lines, voice, duration, NICHES.find(n=>n.id===niche)?.label);
 
       // Step 6-8: Poll render
       setGenStep(6); setGenPercent(65);
