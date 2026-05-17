@@ -141,91 +141,23 @@ async function generateScript(niche, style, duration, topic) {
   return await res.json();
 }
 
-async function submitShotstackRender(apiKey, videoUrls, scriptLines, voiceId, duration, nicheLabel) {
-  const clipDuration = parseInt(duration) / videoUrls.length;
-
-  const videoClips = videoUrls.map((url, i) => ({
-    asset: { type: "video", src: url, volume: 0, trim: 0 },
-    start: i * clipDuration,
-    length: clipDuration,
-    fit: "cover"
-  }));
-
-  const lineCount = scriptLines.length;
-  const lineDuration = parseInt(duration) / lineCount;
-  const captionClips = scriptLines.map((line, i) => ({
-    asset: {
-      type: "title",
-      text: line,
-      style: "minimal",
-      color: "#ffffff",
-      size: "medium",
-      background: "rgba(0,0,0,0.6)",
-      position: "bottom"
-    },
-    start: i * lineDuration,
-    length: lineDuration,
-    position: "bottom"
-  }));
-
-  // Use Shotstack's free background music instead of TTS (more reliable in sandbox)
-  const audioClip = {
-    asset: {
-      type: "audio",
-      src: "https://shotstack-assets.s3.ap-southeast-2.amazonaws.com/music/freepd/algorithm.mp3",
-      volume: 0.5
-    },
-    start: 0,
-    length: parseInt(duration)
-  };
-
-  const payload = {
-    timeline: {
-      background: "#000000",
-      tracks: [
-        { clips: captionClips },
-        { clips: videoClips },
-        { clips: [audioClip] }
-      ]
-    },
-    output: {
-      format: "mp4",
-      resolution: "sd",
-      aspectRatio: "9:16",
-      size: { width: 540, height: 960 }
-    }
-  };
-
-  // Call our Vercel serverless function — no CORS issues
+async function submitZSkyRender(niche, style, scriptLines) {
+  const nicheData = NICHES.find(n => n.id === niche);
+  const styleData = STYLES.find(s => s.id === style);
   const res = await fetch("/api/render", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ apiKey, niche: nicheLabel, lines: scriptLines })
+    body: JSON.stringify({ niche: nicheData?.label, style: styleData?.label, lines: scriptLines })
   });
-
   if (!res.ok) {
     const err = await res.json();
-    throw new Error(err.error || "Shotstack render failed");
+    throw new Error(err.error || "Video generation failed");
   }
-
   const data = await res.json();
-  return data.response.id;
+  return data.videoUrl || data.videoData;
 }
 
-async function pollShotstackRender(apiKey, renderId, onProgress) {
-  const maxAttempts = 60;
-  for (let i = 0; i < maxAttempts; i++) {
-    await new Promise(r => setTimeout(r, 3000));
-    // Call our Vercel serverless function — no CORS issues
-    const res = await fetch(`/api/status?id=${renderId}&apiKey=${encodeURIComponent(apiKey)}`);
-    const data = await res.json();
-    const status = data.response?.status;
-    onProgress(status, i);
-    if (status === "done") return data.response.url;
-    if (status === "failed") throw new Error("Render failed on Shotstack");
-  }
-  throw new Error("Render timed out");
-}
+
 
 // ── AUTH MODAL ─────────────────────────────────────────────────────────
 function AuthModal({ onClose, onSuccess }) {
@@ -356,17 +288,16 @@ function CreateView({ onGenerated, shotstackKey, onNeedKey }) {
     "Analyzing niche & audience...",
     "Writing viral hook...",
     "Crafting full script...",
-    "Fetching stock footage...",
-    "Submitting to Shotstack...",
-    "Rendering video...",
-    "Adding captions...",
+    "Preparing visual prompt...",
+    "Sending to ZSky AI...",
+    "Generating video & audio...",
+    "Adding your content...",
     "Finalizing MP4...",
   ];
 
   const generate = async () => {
-    if (!shotstackKey) { onNeedKey(); return; }
     setStep(3); setGenerating(true); setGenStep(0); setGenPercent(0); setGenElapsed(0); setError(null);
-    const totalEst = 45;
+    const totalEst = 35;
     setGenETA(totalEst);
     const start = Date.now();
     timerRef.current = setInterval(() => {
@@ -399,26 +330,18 @@ function CreateView({ onGenerated, shotstackKey, onNeedKey }) {
       }
       setGenStep(3); setGenPercent(35);
 
-      // Step 4: Get niche footage
-      await new Promise(r => setTimeout(r, 400));
-      setGenStep(4); setGenPercent(45);
-      const videoUrls = getNicheVideos(niche);
+      // Step 4-8: Generate video with ZSky AI
+      setGenStep(4); setGenPercent(50);
+      setRenderStatus("generating");
+      await new Promise(r => setTimeout(r, 300));
+      setGenStep(5); setGenPercent(60);
+      await new Promise(r => setTimeout(r, 300));
+      setGenStep(6); setGenPercent(70);
 
-      // Step 5: Submit to Shotstack
-      setGenStep(5); setGenPercent(55);
-      const renderId = await submitShotstackRender(shotstackKey, videoUrls, script.lines, voice, duration, NICHES.find(n=>n.id===niche)?.label);
+      const videoUrl = await submitZSkyRender(niche, style, script.lines);
 
-      // Step 6-8: Poll render
-      setGenStep(6); setGenPercent(65);
-      let pollCount = 0;
-      const videoUrl = await pollShotstackRender(shotstackKey, renderId, (status, attempt) => {
-        pollCount = attempt;
-        setRenderStatus(status);
-        const p = Math.min(95, 65 + attempt * 3);
-        setGenPercent(p);
-        if (attempt % 3 === 0) setGenStep(prev => Math.min(7, prev + 1));
-      });
-
+      setGenStep(7); setGenPercent(90);
+      await new Promise(r => setTimeout(r, 300));
       setGenStep(8); setGenPercent(100);
       clearInterval(timerRef.current);
 
@@ -465,7 +388,7 @@ function CreateView({ onGenerated, shotstackKey, onNeedKey }) {
                 <span style={{fontSize:10,color:"var(--muted)"}}>100%</span>
               </div>
             </div>
-            {renderStatus && <div style={{fontSize:12,color:"var(--gold)",marginBottom:16,letterSpacing:1}}>Shotstack: {renderStatus.toUpperCase()}</div>}
+            {renderStatus && <div style={{fontSize:12,color:"var(--gold)",marginBottom:16,letterSpacing:1}}>ZSky AI: {renderStatus.toUpperCase()}</div>}
             <div style={{maxWidth:380,margin:"0 auto",textAlign:"left"}}>
               {GEN_STEPS.map((s,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",opacity:genStep>i?1:genStep===i?.8:.2,transition:"opacity .3s"}}>
