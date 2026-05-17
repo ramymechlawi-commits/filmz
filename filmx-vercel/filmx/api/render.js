@@ -29,42 +29,22 @@ module.exports = async function handler(req, res) {
   const totalLength = scriptLines.length * clipLength;
 
   const titleClips = scriptLines.map((line, i) => ({
-    asset: {
-      type: "title",
-      text: line,
-      style: "minimal",
-      color: "#ffffff",
-      size: "medium",
-      position: "center"
-    },
+    asset: { type: "title", text: line, style: "minimal", color: "#ffffff", size: "medium", position: "center" },
     start: i * clipLength,
     length: clipLength
   }));
 
-  const musicClip = {
-    asset: {
-      type: "audio",
-      src: "https://shotstack-assets.s3.ap-southeast-2.amazonaws.com/music/freepd/algorithm.mp3",
-      volume: 0.4,
-      effect: "fadeOut"
-    },
-    start: 0,
-    length: totalLength
-  };
-
   const payload = {
     timeline: {
       background: "#000000",
+      soundtrack: {
+        src: "https://shotstack-assets.s3.ap-southeast-2.amazonaws.com/music/freepd/algorithm.mp3",
+        effect: "fadeOut",
+        volume: 0.5
+      },
       tracks: [
         { clips: titleClips },
-        {
-          clips: [{
-            asset: { type: "video", src: videoSrc, volume: 0 },
-            start: 0,
-            length: totalLength
-          }]
-        },
-        { clips: [musicClip] }
+        { clips: [{ asset: { type: "video", src: videoSrc, volume: 0 }, start: 0, length: totalLength }] }
       ]
     },
     output: { format: "mp4", resolution: "sd" }
@@ -73,15 +53,11 @@ module.exports = async function handler(req, res) {
   try {
     const response = await fetch("https://api.shotstack.io/edit/stage/render", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey
-      },
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey },
       body: JSON.stringify(payload)
     });
-
     const data = await response.json();
-    if (!response.ok) return res.status(response.status).json({ error: data.message || "Shotstack error", details: data });
+    if (!response.ok) return res.status(response.status).json({ error: data.message || "Shotstack error" });
     return res.status(200).json(data);
   } catch (err) {
     return res.status(500).json({ error: err.message });
