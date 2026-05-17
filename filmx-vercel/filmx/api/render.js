@@ -41,6 +41,17 @@ module.exports = async function handler(req, res) {
     length: clipLength
   }));
 
+  const musicClip = {
+    asset: {
+      type: "audio",
+      src: "https://shotstack-assets.s3.ap-southeast-2.amazonaws.com/music/freepd/algorithm.mp3",
+      volume: 0.4,
+      effect: "fadeOut"
+    },
+    start: 0,
+    length: totalLength
+  };
+
   const payload = {
     timeline: {
       background: "#000000",
@@ -52,7 +63,8 @@ module.exports = async function handler(req, res) {
             start: 0,
             length: totalLength
           }]
-        }
+        },
+        { clips: [musicClip] }
       ]
     },
     output: { format: "mp4", resolution: "sd" }
